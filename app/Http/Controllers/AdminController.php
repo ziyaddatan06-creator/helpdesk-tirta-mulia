@@ -5,61 +5,55 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Ticket;
 use App\Models\TicketStatus;
+use App\Models\TicketCategory;
 use App\Models\TicketComment;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Storage; // <-- PENTING UNTUK HAPUS FOTO
 
 class AdminController extends Controller
 {
+    // 1. Dashboard Admin
     public function dashboard()
     {
-        $totalTickets = Ticket::count();
-        $openTickets = Ticket::whereHas('status', function($q) { $q->where('name', 'Open'); })->count();
-        $processTickets = Ticket::whereHas('status', function($q) { $q->whereNotIn('name', ['Open', 'Selesai', 'Ditutup']); })->count();
+        $activeTickets = Ticket::whereHas('status', function($q) { $q->whereNotIn('name', ['Selesai', 'Ditutup']); })->count();
         $completedTickets = Ticket::whereHas('status', function($q) { $q->whereIn('name', ['Selesai', 'Ditutup']); })->count();
-
-        $tickets = Ticket::with(['customer', 'category', 'status'])->latest()->get();
-
-        return view('admin.dashboard', compact('totalTickets', 'openTickets', 'processTickets', 'completedTickets', 'tickets'));
+        $tickets = Ticket::with(['customer', 'category', 'status'])->latest()->take(5)->get();
+        
+        // --- DATA UNTUK GRAFIK CHART.JS ---
+        $categories = TicketCategory::withCount('tickets')->get();
+        $chartLabels = $categories->pluck('name');
+        $chartData = $categories->pluck('tickets_count');
+        
+        return view('admin.dashboard', compact('activeTickets', 'completedTickets', 'tickets', 'chartLabels', 'chartData'));
     }
 
+    // 2. Detail Tiket & Live Chat
     public function show($id)
     {
-        $ticket = Ticket::with(['customer', 'category', 'status', 'attachments', 'comments.user'])->findOrFail($id);
+        $ticket = Ticket::with(['customer', 'category', 'status', 'attachments', 'comments.user', 'technician'])->findOrFail($id);
         
         TicketStatus::firstOrCreate(['name' => 'Open'], ['color_code' => '#3b82f6', 'order' => 1]);
         TicketStatus::firstOrCreate(['name' => 'Sedang Diproses'], ['color_code' => '#f59e0b', 'order' => 2]);
         TicketStatus::firstOrCreate(['name' => 'Selesai'], ['color_code' => '#10b981', 'order' => 3]);
         
         $statuses = TicketStatus::orderBy('order')->get();
+        $technicians = User::role('Teknisi')->get(); 
 
-        return view('admin.tickets.show', compact('ticket', 'statuses'));
+        return view('admin.tickets.show', compact('ticket', 'statuses', 'technicians'));
     }
 
+    // 3. Update Status Laporan
     public function update(Request $request, $id)
     {
         $request->validate(['status_id' => 'required|exists:ticket_statuses,id']);
         
         $ticket = Ticket::findOrFail($id);
-        $oldStatus = $ticket->status->name;
-        
         $ticket->update(['status_id' => $request->status_id]);
-        $newStatus = TicketStatus::find($request->status_id)->name;
-
-        if ($oldStatus !== $newStatus) {
-            TicketComment::create([
-                'ticket_id' => $ticket->id,
-                'user_id' => auth()->id(),
-                'body' => "Sistem: Status laporan diubah menjadi '" . $newStatus . "' oleh Admin.",
-            ]);
-        }
-
-        return back()->with('success', 'Status laporan berhasil diperbarui!');
+        
+        return back()->with('success', 'Status berhasil diperbarui!');
     }
 
+    // 4. Komentar Live Chat
     public function comment(Request $request, $id)
     {
         $request->validate(['body' => 'required|string']);
@@ -70,84 +64,97 @@ class AdminController extends Controller
             'body' => $request->body,
         ]);
 
-        return back()->with('success', 'Pesan balasan berhasil dikirim.');
+        return back()->with('success', 'Pesan terkirim.');
     }
 
-    public function reports()
+    // 5. Delegasi Teknisi
+    public function assign(Request $request, $id)
     {
-        return view('admin.reports.index');
+        $request->validate(['technician_id' => 'required|exists:users,id']);
+        
+        $ticket = Ticket::findOrFail($id);
+        $ticket->update(['technician_id' => $request->technician_id]);
+        
+        $techName = User::find($request->technician_id)->name;
+
+        TicketComment::create([
+            'ticket_id' => $ticket->id,
+            'user_id' => auth()->id(),
+            'body' => "Sistem: Laporan ini telah didelegasikan kepada Teknisi Lapangan: " . $techName,
+        ]);
+
+        return back()->with('success', 'Teknisi berhasil ditugaskan!');
     }
 
-    public function printReport(Request $request)
+    // ==========================================
+    // MENU BARU YANG TADI BIKIN ERROR
+    // ==========================================
+    
+    // 6. Halaman Semua Laporan
+    public function index() 
     {
-        $type = $request->type; 
-        $query = Ticket::with(['customer', 'category', 'status'])->latest();
-        $title = 'Laporan Seluruh Pengaduan IT';
-
-        if ($type == 'harian') {
-            $query->whereDate('created_at', Carbon::today());
-            $title = 'Laporan Harian (Tanggal: ' . Carbon::now()->format('d M Y') . ')';
-        } 
-        elseif ($type == 'mingguan') {
-            $query->whereBetween('created_at', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()]);
-            $title = 'Laporan Mingguan (' . Carbon::now()->startOfWeek()->format('d M') . ' - ' . Carbon::now()->endOfWeek()->format('d M Y') . ')';
-        } 
-        elseif ($type == 'bulanan') {
-            $query->whereMonth('created_at', date('m'))->whereYear('created_at', date('Y'));
-            $title = 'Laporan Bulanan (Bulan: ' . Carbon::now()->format('F Y') . ')';
-        }
-
-        $tickets = $query->get();
-
-        return view('admin.reports.print', compact('tickets', 'title'));
+        $tickets = Ticket::with(['customer', 'category', 'status', 'technician'])->latest()->get();
+        return view('admin.tickets.index', compact('tickets'));
     }
 
-    public function users()
+    // 7. Halaman Kategori Keluhan
+    public function categories() 
     {
-        $users = User::with('roles')->latest()->get();
+        $categories = TicketCategory::all();
+        return view('admin.categories.index', compact('categories'));
+    }
+
+    // 8. Halaman Pengaturan Sistem
+    public function settings() 
+    {
+        return view('admin.settings');
+    }
+
+    // ==========================================
+    // MANAJEMEN AKUN & LAPORAN PDF
+    // ==========================================
+
+    public function users() 
+    {
+        $users = User::with('roles')->get();
         return view('admin.users.index', compact('users'));
     }
 
-    public function storeUser(Request $request)
+    public function storeUser(Request $request) 
     {
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
-            'role' => 'required|string'
+            'role' => 'required'
         ]);
 
-        $username = Str::slug($request->name) . rand(10, 99);
-
-        $user = new User();
-        $user->name = $request->name;
-        $user->username = $username;
-        $user->email = $request->email;
-        $user->password = Hash::make($request->password);
-        $user->save();
-
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => Hash::make($request->password),
+        ]);
+        
         $user->assignRole($request->role);
-
-        return back()->with('success', 'Akun ' . $request->name . ' berhasil dibuat!');
+        return back()->with('success', 'Akun berhasil dibuat!');
     }
 
-    // --- FUNGSI BARU UNTUK MENGHAPUS AKUN ---
-    public function destroyUser($id)
+    public function destroyUser($id) 
     {
         $user = User::findOrFail($id);
-
-        // Keamanan: Admin tidak bisa menghapus akunnya sendiri
-        if ($user->id === auth()->id()) {
-            return back()->withErrors(['error' => 'Anda tidak diizinkan menghapus akun Anda sendiri!']);
-        }
-
-        // Hapus file foto dari server (agar tidak menuh-menuhin memori)
-        if ($user->avatar) {
-            Storage::disk('public')->delete($user->avatar);
-        }
-
         $user->delete();
+        return back()->with('success', 'Akun berhasil dihapus!');
+    }
 
-        return back()->with('success', 'Akun berhasil dihapus secara permanen!');
+    public function reports() 
+    {
+        $tickets = Ticket::with(['customer', 'category', 'status', 'technician'])->latest()->get();
+        return view('admin.reports.index', compact('tickets'));
+    }
+
+    public function printReport() 
+    {
+        $tickets = Ticket::with(['customer', 'category', 'status', 'technician'])->latest()->get();
+        return view('admin.reports.print', compact('tickets'));
     }
 }

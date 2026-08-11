@@ -1,94 +1,100 @@
 <x-app-layout>
-   <div class="mb-8 mt-4 md:flex md:items-center md:justify-between">
+    <!-- Memanggil Library Chart.js dari Internet -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <div class="mb-6 mt-4 flex justify-between items-end">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Dashboard IT Admin</h1>
-            <p class="text-sm text-gray-500 mt-1">Pantau dan kelola semua laporan kendala kantor dari seluruh pegawai.</p>
-        </div>
-        <div class="mt-4 md:mt-0 flex flex-wrap gap-2">
-            <!-- Tombol Manajemen Akun Baru -->
-            <a href="{{ route('admin.users.index') }}" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-lg shadow-sm hover:bg-indigo-700 transition">
-                <i data-lucide="users" class="w-4 h-4 mr-2"></i> Kelola Akun
-            </a>
-            
-            <a href="{{ route('admin.reports.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-bold rounded-lg shadow-sm hover:bg-gray-700 transition">
-                <i data-lucide="printer" class="w-4 h-4 mr-2"></i> Cetak Laporan
-            </a>
-            
-            <span class="inline-flex items-center px-4 py-2 bg-blue-50 text-blue-700 text-sm font-bold rounded-lg border border-blue-200">
-                <i data-lucide="shield-check" class="w-4 h-4 mr-2"></i> {{ Auth::user()->name }}
-            </span>
+            <h1 class="text-2xl font-bold text-gray-900">Beranda Admin IT</h1>
+            <p class="text-gray-500 text-sm mt-1">Pantau dan kelola semua laporan kendala dari pegawai PDAM Tirta Mulia.</p>
         </div>
     </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-l-4 border-l-blue-500">
-            <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider">Tiket Baru (Open)</h3>
-            <p class="text-3xl font-black text-gray-900 mt-2">{{ $openTickets }}</p>
+    <!-- Widget Statistik Utama -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-orange-100 flex items-center gap-5 hover:shadow-md transition">
+            <div class="w-14 h-14 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center shrink-0"><i data-lucide="alert-circle" class="w-7 h-7"></i></div>
+            <div><p class="text-sm font-bold text-gray-500">Tiket Aktif / Proses</p><p class="text-3xl font-black text-gray-900">{{ $activeTickets }}</p></div>
         </div>
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-l-4 border-l-yellow-500">
-            <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider">Sedang Diproses</h3>
-            <p class="text-3xl font-black text-gray-900 mt-2">{{ $processTickets }}</p>
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-green-100 flex items-center gap-5 hover:shadow-md transition">
+            <div class="w-14 h-14 bg-green-100 text-green-600 rounded-full flex items-center justify-center shrink-0"><i data-lucide="check-circle" class="w-7 h-7"></i></div>
+            <div><p class="text-sm font-bold text-gray-500">Tiket Selesai</p><p class="text-3xl font-black text-gray-900">{{ $completedTickets }}</p></div>
         </div>
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-l-4 border-l-green-500">
-            <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider">Selesai</h3>
-            <p class="text-3xl font-black text-gray-900 mt-2">{{ $completedTickets }}</p>
-        </div>
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-l-4 border-l-gray-700">
-            <h3 class="text-gray-500 text-xs font-bold uppercase tracking-wider">Total Laporan</h3>
-            <p class="text-3xl font-black text-gray-900 mt-2">{{ $totalTickets }}</p>
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-blue-100 flex items-center gap-5 hover:shadow-md transition">
+            <div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center shrink-0"><i data-lucide="ticket" class="w-7 h-7"></i></div>
+            <div><p class="text-sm font-bold text-gray-500">Total Semua Laporan</p><p class="text-3xl font-black text-gray-900">{{ $activeTickets + $completedTickets }}</p></div>
         </div>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-10">
-        <div class="p-5 border-b border-gray-100 bg-gray-50/50">
-            <h2 class="font-bold text-gray-900">Daftar Laporan Masuk</h2>
+    <!-- Layout 2 Kolom: Kiri Grafik, Kanan Tabel -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        
+        <!-- KOLOM KIRI: Grafik Chart.js (Porsi 1/3) -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden col-span-1 p-5">
+            <h2 class="font-bold text-gray-900 flex items-center gap-2 mb-4 border-b border-gray-100 pb-3">
+                <i data-lucide="pie-chart" class="w-5 h-5 text-purple-500"></i> Statistik Kategori
+            </h2>
+            <div class="relative w-full aspect-square flex items-center justify-center">
+                <canvas id="kategoriChart"></canvas>
+            </div>
         </div>
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left">
-                <thead class="text-xs text-gray-500 bg-gray-50 uppercase border-b border-gray-100">
-                    <tr>
-                        <th class="px-6 py-4">ID & Tanggal</th>
-                        <th class="px-6 py-4">Pelapor (Pegawai)</th>
-                        <th class="px-6 py-4">Judul Kendala</th>
-                        <th class="px-6 py-4">Kategori</th>
-                        <th class="px-6 py-4">Status</th>
-                        <th class="px-6 py-4 text-center">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-50">
-                    @forelse($tickets as $ticket)
-                    <tr class="hover:bg-blue-50/50 transition">
-                        <td class="px-6 py-4">
-                            <span class="font-bold text-gray-900 block">{{ $ticket->ticket_number }}</span>
-                            <span class="text-xs text-gray-500">{{ $ticket->created_at->format('d M Y, H:i') }}</span>
-                        </td>
-                        <td class="px-6 py-4 font-medium text-gray-700">{{ $ticket->customer->name }}</td>
-                        <td class="px-6 py-4"><span class="font-bold text-gray-900 block truncate w-48">{{ $ticket->title }}</span></td>
-                        <td class="px-6 py-4"><span class="text-xs font-medium text-gray-600 bg-gray-100 px-2.5 py-1 rounded-md">{{ $ticket->category->name }}</span></td>
-                        <td class="px-6 py-4">
-                            <span class="text-xs font-bold px-2.5 py-1.5 rounded-md" style="background-color: {{ $ticket->status->color_code }}20; color: {{ $ticket->status->color_code }}">
-                                {{ $ticket->status->name }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 text-center">
-                            <!-- Link ini sudah diperbaiki dan ditambah whitespace-nowrap agar tidak tergencet -->
-                            <a href="{{ route('admin.tickets.show', $ticket->id) }}" class="whitespace-nowrap inline-block text-white bg-blue-600 hover:bg-blue-700 font-semibold rounded-lg text-xs px-4 py-2 transition shadow-sm">
-                                Proses Laporan
-                            </a>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="6" class="px-6 py-12 text-center">
-                            <div class="flex flex-col items-center justify-center">
-                                <i data-lucide="shield-check" class="w-12 h-12 text-gray-300 mb-3"></i>
-                                <p class="text-gray-500 font-medium">Belum ada laporan masuk dari pegawai.</p>
-                            </div>
-                        </td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
+
+        <!-- KOLOM KANAN: Tabel 5 Laporan Terbaru (Porsi 2/3) -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden lg:col-span-2 flex flex-col">
+            <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h2 class="font-bold text-gray-900 flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5 text-blue-500"></i> Laporan Terbaru</h2>
+                <a href="{{ route('admin.tickets.index') }}" class="text-sm font-bold text-blue-600 hover:underline">Lihat Semua</a>
+            </div>
+            <div class="overflow-x-auto flex-1">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-gray-500 bg-white uppercase border-b border-gray-100">
+                        <tr><th class="px-6 py-4">No. Tiket</th><th class="px-6 py-4">Pelapor</th><th class="px-6 py-4 text-center">Status</th><th class="px-6 py-4 text-center">Aksi</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        @forelse($tickets as $t)
+                        <tr class="hover:bg-gray-50/50">
+                            <td class="px-6 py-4"><span class="font-bold text-gray-900 block">{{ $t->ticket_number }}</span><span class="text-xs text-gray-500 line-clamp-1">{{ $t->title }}</span></td>
+                            <td class="px-6 py-4 font-medium">{{ $t->customer->name }}</td>
+                            <td class="px-6 py-4 text-center"><span class="text-[10px] font-bold px-2 py-1 rounded-md" style="background-color: {{ $t->status->color_code }}20; color: {{ $t->status->color_code }}">{{ $t->status->name }}</span></td>
+                            <td class="px-6 py-4 text-center"><a href="{{ route('admin.tickets.show', $t->id) }}" class="text-blue-600 hover:underline font-bold text-xs bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">Buka</a></td>
+                        </tr>
+                        @empty
+                        <tr><td colspan="4" class="px-6 py-10 text-center text-gray-500 font-medium">Belum ada laporan terbaru.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
+
+    <!-- Script Penggerak Grafik -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const ctx = document.getElementById('kategoriChart').getContext('2d');
+            
+            // Ambil data dari Controller
+            const labels = {!! json_encode($chartLabels) !!};
+            const data = {!! json_encode($chartData) !!};
+
+            new Chart(ctx, {
+                type: 'doughnut', // Tipe grafik kue berlubang
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444'], // Warna warni
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11, family: "'Figtree', sans-serif" } } }
+                    },
+                    cutout: '70%' // Ukuran lubang di tengah
+                }
+            });
+        });
+    </script>
 </x-app-layout>

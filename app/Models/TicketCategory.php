@@ -1,8 +1,19 @@
 <?php
+
 namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class TicketCategory extends Model
 {
-    protected $guarded = ['id'];
+    use HasFactory;
+
+    protected $fillable = ['name'];
+
+    // --- FUNGSI BARU UNTUK MENGHUBUNGKAN KATEGORI DENGAN TIKET ---
+    public function tickets()
+    {
+        return $this->hasMany(Ticket::class, 'category_id');
+    }
 }
